@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/indes/flowerss-bot/bot"
-	"github.com/indes/flowerss-bot/task"
+	"github.com/indes/flowerss-bot/web"
 )
 
 func main() {
-	go task.Update()
-	bot.Start()
+	//go task.Update()
+	web.Run()
+	//go bot.Start()
 }

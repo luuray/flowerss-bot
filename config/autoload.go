@@ -15,6 +15,7 @@ var (
 	EnableMysql     bool
 	UpdateInterval  int  = 10
 	ErrorThreshold  uint = 100
+	WebPort         uint = 8181
 )
 
 type MysqlConfig struct {
@@ -63,6 +64,9 @@ func init() {
 		}
 	} else {
 		EnableMysql = false
+	}
+	if viper.IsSet("web.port") {
+		WebPort = uint(viper.GetInt("web.port"))
 	}
 
 }
