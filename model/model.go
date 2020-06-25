@@ -10,43 +10,43 @@ import (
 	"time"
 )
 
-func init() {
-	db := getConnect()
-	defer db.Close()
+var db *gorm.DB
+
+func ConnectDB() {
+	var err error
+
+	if config.EnableMysql {
+		db, err = gorm.Open("mysql", config.Mysql.GetMysqlConnectingString())
+	} else {
+		db, err = gorm.Open("sqlite3", config.SQLitePath)
+	}
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	db.DB().SetMaxIdleConns(10)
+	db.DB().SetMaxOpenConns(50)
 	db.LogMode(true)
-	if !db.HasTable(&Source{}) {
-		db.CreateTable(&Source{})
-	}
 
-	if !db.HasTable(&Subscribe{}) {
-		db.CreateTable(&Subscribe{})
-	}
-
-	if !db.HasTable(&Content{}) {
-		db.CreateTable(&Content{})
-	}
-	if !db.HasTable(&User{}) {
-		db.CreateTable(&User{})
-	}
+	createOrUpdateTable(&Subscribe{})
+	createOrUpdateTable(&User{})
+	createOrUpdateTable(&Source{})
+	createOrUpdateTable(&Option{})
+	createOrUpdateTable(&Content{})
 }
 
-func getConnect() *gorm.DB {
-	if config.EnableMysql {
-		clientConfig := config.Mysql.GetMysqlConnectingString()
-		db, err := gorm.Open("mysql", clientConfig)
-		if err != nil {
-			panic("连接MySQL数据库失败")
-		}
-		return db
-	} else {
-		db, err := gorm.Open("sqlite3", config.SQLitePath)
-		if err != nil {
-			log.Println(err.Error())
-			panic("连接SQLite数据库失败")
-		}
-		return db
-	}
+// Disconnect disconnects from the database.
+func Disconnect() {
+	db.Close()
+}
 
+// createOrUpdateTable create table or Migrate table
+func createOrUpdateTable(model interface{}) {
+	if !db.HasTable(model) {
+		db.CreateTable(model)
+	} else {
+		db.AutoMigrate(model)
+	}
 }
 
 //EditTime timestamp

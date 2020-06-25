@@ -33,6 +33,7 @@ var (
 	MessageTpl            *template.Template
 	MessageMode           tb.ParseMode
 	TelegramEndpoint      string
+	UserAgent             string
 )
 
 const (
@@ -53,7 +54,9 @@ const (
 {{.ContentTitle}} [Telegraph]({{.TelegraphURL}}) | [原文]({{.RawLink}})
 {{- else }}
 [{{.ContentTitle}}]({{.RawLink}})
-{{- end }}`
+{{- end }}
+{{.Tags}}
+`
 )
 
 type MysqlConfig struct {
@@ -70,6 +73,7 @@ type TplData struct {
 	RawLink         string
 	PreviewText     string
 	TelegraphURL    string
+	Tags            string
 	EnableTelegraph bool
 }
 
@@ -77,6 +81,7 @@ func init() {
 
 	workDirFlag := flag.String("d", "./", "work directory of flowerss")
 	configFile := flag.String("c", "", "config file of flowerss")
+	printVersionFlag := flag.Bool("v", false, "prints flowerss-bot version")
 
 	testTpl := flag.Bool("testtpl", false, "test template")
 
@@ -91,6 +96,13 @@ func init() {
 	//TelegramEndpointCli := flag.String("endpoint", "", "Custom Telegram Endpoint")
 
 	flag.Parse()
+
+	if *printVersionFlag {
+		// print version
+		fmt.Printf(AppVersionInfo())
+		os.Exit(0)
+	}
+
 	workDir := filepath.Clean(*workDirFlag)
 
 	if *configFile != "" {
@@ -114,6 +126,7 @@ func init() {
 
 	BotToken = viper.GetString("bot_token")
 	Socks5 = viper.GetString("socks5")
+	UserAgent = viper.GetString("user_agent")
 
 	if viper.IsSet("telegraph_token") {
 		EnableTelegraph = true
@@ -208,6 +221,7 @@ func validateTPL() {
 			"https://www.github.com/",
 			"",
 			"",
+			"",
 			false,
 		},
 		TplData{
@@ -216,6 +230,7 @@ func validateTPL() {
 			"https://www.github.com/",
 			"这里是很长很长很长的消息预览字数补丁紫薯补丁紫薯补丁紫薯补丁紫薯补丁[1](123)",
 			"",
+			"#标签",
 			false,
 		},
 		TplData{
@@ -224,6 +239,7 @@ func validateTPL() {
 			"https://www.github.com/",
 			"这里是很长很长很长的消息预览字数补丁紫薯补丁紫薯补丁紫薯补丁紫薯补丁",
 			"https://telegra.ph/markdown-07-07",
+			"#标签1 #标签2",
 			true,
 		},
 	}
