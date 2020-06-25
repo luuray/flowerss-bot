@@ -582,7 +582,7 @@ func unsubCmdCtr(m *tb.Message) {
 							ParseMode:             tb.ModeMarkdown,
 						},
 					)
-					log.Printf("%d for [%s]%s unsubscribe [%d]%s %s", m.Chat.ID, source.ID, source.Title, source.Link)
+					log.Printf("%d for [%d]%s unsubscribe %s", m.Chat.ID, source.ID, source.Title, source.Link)
 				} else {
 					_, err = B.Send(m.Chat, err.Error())
 				}

@@ -56,6 +56,7 @@ func fetchFunc(url string) (resp *http.Response, err error) {
 		return nil, err
 	}
 	_ = resp.Body.Close()
+
 	resp.Body = ioutil.NopCloser(strings.NewReader(strings.Map(func(r rune) rune {
 		if unicode.IsPrint(r) {
 			return r
