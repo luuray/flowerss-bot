@@ -2,14 +2,16 @@ package bot
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/indes/flowerss-bot/config"
+	"github.com/indes/flowerss-bot/log"
 	"github.com/indes/flowerss-bot/model"
+
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
+// FeedForChannelRegister register feed for channel
 func FeedForChannelRegister(m *tb.Message, url string, channelMention string) {
 	msg, err := B.Send(m.Chat, "处理中...")
 	channelChat, err := B.ChatByID(channelMention)
@@ -47,7 +49,13 @@ func FeedForChannelRegister(m *tb.Message, url string, channelMention string) {
 	log.Printf("%d for %d subscribe [%d]%s %s", m.Chat.ID, channelChat.ID, source.ID, source.Title, source.Link)
 
 	if err == nil {
-		newText := fmt.Sprintf("频道 [%s](https://t.me/%s) 订阅 [%s](%s) 成功", channelChat.Title, channelChat.Username, source.Title, source.Link)
+		newText := fmt.Sprintf(
+			"频道 [%s](https://t.me/%s) 订阅 [%s](%s) 成功",
+			channelChat.Title,
+			channelChat.Username,
+			source.Title,
+			source.Link,
+		)
 		_, err = B.Edit(msg, newText,
 			&tb.SendOptions{
 				DisableWebPagePreview: true,
@@ -87,12 +95,16 @@ func SendError(c *tb.Chat) {
 	_, _ = B.Send(c, "请输入正确的指令！")
 }
 
-//BroadNews send new contents message to subscriber
-func BroadNews(source *model.Source, subs []model.Subscribe, contents []model.Content) {
+//BroadcastNews send new contents message to subscriber
+func BroadcastNews(source *model.Source, subs []model.Subscribe, contents []model.Content) {
+	log.Infow("broadcast news",
+		"feed id", source.ID,
+		"feed title", source.Title,
+		"subscriber count", len(subs),
+		"new contents", len(contents),
+	)
 
-	log.Printf("Source Title: <%s> Subscriber: %d New Contents: %d", source.Title, len(subs), len(contents))
 	for _, content := range contents {
-
 		previewText := trimDescription(content.Description, config.PreviewText)
 
 		for _, sub := range subs {
@@ -101,9 +113,9 @@ func BroadNews(source *model.Source, subs []model.Subscribe, contents []model.Co
 				ContentTitle:    content.Title,
 				RawLink:         content.RawLink,
 				PreviewText:     previewText,
-				TelegraphURL:    content.TelegraphUrl,
+				TelegraphURL:    content.TelegraphURL,
 				Tags:            sub.Tag,
-				EnableTelegraph: sub.EnableTelegraph == 1 && content.TelegraphUrl != "",
+				EnableTelegraph: sub.EnableTelegraph == 1 && content.TelegraphURL != "",
 			}
 
 			u := &tb.User{
@@ -116,13 +128,21 @@ func BroadNews(source *model.Source, subs []model.Subscribe, contents []model.Co
 			}
 			msg, err := tpldata.Render(config.MessageMode)
 			if err != nil {
-				log.Println("BroadNews tpldata.Render err ", err)
+				log.Errorw("broadcast news error, tpldata.Render err",
+					"error", err.Error(),
+				)
 				return
 			}
 			if _, err := B.Send(u, msg, o); err != nil {
-				log.Println(err)
+
 				if strings.Contains(err.Error(), "Forbidden") {
-					log.Printf("Unsubscribe UserID:%d SourceID:%d", sub.UserID, sub.SourceID)
+					log.Errorw("broadcast news error, bot stopped by user",
+						"error", err.Error(),
+						"user id", sub.UserID,
+						"source id", sub.SourceID,
+						"title", source.Title,
+						"link", source.Link,
+					)
 					sub.Unsub()
 				}
 
@@ -132,14 +152,18 @@ func BroadNews(source *model.Source, subs []model.Subscribe, contents []model.Co
 					api error: Bad Request: can't parse entities: Can't find end of the entity starting at byte offset 894
 				*/
 				if strings.Contains(err.Error(), "parse entities") {
-					log.Println("Markdown Err: ", msg)
+					log.Errorw("broadcast news error, markdown error",
+						"markdown msg", msg,
+						"error", err.Error(),
+					)
 				}
 			}
 		}
 	}
 }
 
-func BroadSourceError(source *model.Source) {
+// BroadcastSourceError send feed updata error message to subscribers
+func BroadcastSourceError(source *model.Source) {
 	subs := model.GetSubscriberBySource(source)
 	var u tb.User
 	for _, sub := range subs {
@@ -151,6 +175,7 @@ func BroadSourceError(source *model.Source) {
 	}
 }
 
+// CheckAdmin check user is admin of group/channel
 func CheckAdmin(upd *tb.Update) bool {
 
 	if upd.Message != nil {
@@ -161,6 +186,7 @@ func CheckAdmin(upd *tb.Update) bool {
 					return true
 				}
 			}
+
 			return false
 		}
 
@@ -173,11 +199,42 @@ func CheckAdmin(upd *tb.Update) bool {
 					return true
 				}
 			}
+
 			return false
 		}
 
 		return true
 	}
+	return false
+}
+
+// IsUserAllowed check user is allowed to use bot
+func isUserAllowed(upd *tb.Update) bool {
+	if upd == nil {
+		return false
+	}
+
+	var userID int64
+
+	if upd.Message != nil {
+		userID = int64(upd.Message.Sender.ID)
+	} else if upd.Callback != nil {
+		userID = int64(upd.Callback.Sender.ID)
+	} else {
+		return false
+	}
+
+	if len(config.AllowUsers) == 0 {
+		return true
+	}
+
+	for _, allowUserID := range config.AllowUsers {
+		if allowUserID == userID {
+			return true
+		}
+	}
+
+	log.Infow("user not allowed", "userID", userID)
 	return false
 }
 
@@ -198,6 +255,7 @@ func userIsAdminOfGroup(userID int, groupChat *tb.Chat) (isAdmin bool) {
 	return
 }
 
+// UserIsAdminChannel check if the user is the administrator of channel
 func UserIsAdminChannel(userID int, channelChat *tb.Chat) (isAdmin bool) {
 	adminList, err := B.AdminsOf(channelChat)
 	isAdmin = false
@@ -214,6 +272,7 @@ func UserIsAdminChannel(userID int, channelChat *tb.Chat) (isAdmin bool) {
 	return
 }
 
+// HasAdminType check if the message is sent in the group/channel environment
 func HasAdminType(t tb.ChatType) bool {
 	hasAdmin := []tb.ChatType{tb.ChatGroup, tb.ChatSuperGroup, tb.ChatChannel, tb.ChatChannelPrivate}
 	for _, n := range hasAdmin {
@@ -224,19 +283,32 @@ func HasAdminType(t tb.ChatType) bool {
 	return false
 }
 
+// GetMentionFromMessage get message mention
 func GetMentionFromMessage(m *tb.Message) (mention string) {
-	for _, entity := range m.Entities {
-		if entity.Type == tb.EntityMention {
-			if mention == "" {
-				mention = m.Text[entity.Offset : entity.Offset+entity.Length]
-
+	if m.Text != "" {
+		for _, entity := range m.Entities {
+			if entity.Type == tb.EntityMention {
+				if mention == "" {
+					mention = m.Text[entity.Offset : entity.Offset+entity.Length]
+					return
+				}
+			}
+		}
+	} else {
+		for _, entity := range m.CaptionEntities {
+			if entity.Type == tb.EntityMention {
+				if mention == "" {
+					mention = m.Caption[entity.Offset : entity.Offset+entity.Length]
+					return
+				}
 			}
 		}
 	}
 	return
 }
 
-func GetUrlAndMentionFromMessage(m *tb.Message) (url string, mention string) {
+// GetURLAndMentionFromMessage get URL and mention from message
+func GetURLAndMentionFromMessage(m *tb.Message) (url string, mention string) {
 	for _, entity := range m.Entities {
 		if entity.Type == tb.EntityMention {
 			if mention == "" {

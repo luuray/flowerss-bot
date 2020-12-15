@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"github.com/spf13/viper"
+	tb "gopkg.in/tucnak/telebot.v2"
 	"log"
 	"os"
 	"path"
@@ -11,73 +13,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"testing"
 	"text/template"
-
-	"github.com/spf13/viper"
-	tb "gopkg.in/tucnak/telebot.v2"
 )
-
-var (
-	ProjectName           string = "flowerss"
-	BotToken              string
-	Socks5                string
-	TelegraphToken        []string
-	EnableTelegraph       bool
-	PreviewText           int = 0
-	DisableWebPagePreview bool
-	Mysql                 MysqlConfig
-	SQLitePath            string
-	EnableMysql           bool
-	UpdateInterval        int  = 10
-	ErrorThreshold        uint = 100
-	MessageTpl            *template.Template
-	MessageMode           tb.ParseMode
-	TelegramEndpoint      string
-	UserAgent             string
-)
-
-const (
-	logo = `
-   __ _                                
-  / _| | _____      _____ _ __ ___ ___ 
- | |_| |/ _ \ \ /\ / / _ \ '__/ __/ __|
- |  _| | (_) \ V  V /  __/ |  \__ \__ \
- |_| |_|\___/ \_/\_/ \___|_|  |___/___/
-
-`
-	defaultMessageTplMode = "md"
-	defaultMessageTpl     = `** {{.SourceTitle}} **{{ if .PreviewText }}
----------- Preview ----------
-{{.PreviewText}}
------------------------------
-{{- end}}{{if .EnableTelegraph}}
-{{.ContentTitle}} [Telegraph]({{.TelegraphURL}}) | [原文]({{.RawLink}})
-{{- else }}
-[{{.ContentTitle}}]({{.RawLink}})
-{{- end }}
-{{.Tags}}
-`
-)
-
-type MysqlConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DB       string
-}
-
-type TplData struct {
-	SourceTitle     string
-	ContentTitle    string
-	RawLink         string
-	PreviewText     string
-	TelegraphURL    string
-	Tags            string
-	EnableTelegraph bool
-}
 
 func init() {
+	if isInTests() {
+		// 测试环境
+		RunMode = TestMode
+		initTPL()
+		return
+	}
 
 	workDirFlag := flag.String("d", "./", "work directory of flowerss")
 	configFile := flag.String("c", "", "config file of flowerss")
@@ -85,16 +31,7 @@ func init() {
 
 	testTpl := flag.Bool("testtpl", false, "test template")
 
-	//telegramTokenCli := flag.String("b", "", "Telegram Bot Token")
-	//telegraphTokenCli := flag.String("t", "", "Telegraph API Token")
-	//previewTextCli := flag.Int("p", 0, "Preview Text Length")
-	//DisableWebPagePreviewCli := flag.Bool("disable_web_page_preview", false, "Disable Web Page Preview")
-	//dbPathCli := flag.String("dbpath", "", "SQLite DB Path")
-	//errorThresholdCli := flag.Int("threshold", 0, "Error Threshold")
-	//socks5Cli := flag.String("s", "", "Socks5 Proxy")
-	//intervalCli := flag.Int("i", 0, "Update Interval")
-	//TelegramEndpointCli := flag.String("endpoint", "", "Custom Telegram Endpoint")
-
+	testing.Init()
 	flag.Parse()
 
 	if *printVersionFlag {
@@ -111,6 +48,7 @@ func init() {
 		viper.SetConfigFile(filepath.Join(workDir, "config.yml"))
 	}
 
+	fmt.Println(logo)
 	err := viper.ReadInConfig() // Find and read the config file
 	if err != nil {             // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %s", err))
@@ -122,8 +60,6 @@ func init() {
 		os.Exit(0)
 	}
 
-	fmt.Println(logo)
-
 	BotToken = viper.GetString("bot_token")
 	Socks5 = viper.GetString("socks5")
 	UserAgent = viper.GetString("user_agent")
@@ -131,34 +67,50 @@ func init() {
 	if viper.IsSet("telegraph_token") {
 		EnableTelegraph = true
 		TelegraphToken = viper.GetStringSlice("telegraph_token")
-	} else {
-		EnableTelegraph = false
+	}
+
+	if viper.IsSet("telegraph_account") {
+		EnableTelegraph = true
+		TelegraphAccountName = viper.GetString("telegraph_account")
+
+		if viper.IsSet("telegraph_author_name") {
+			TelegraphAuthorName = viper.GetString("telegraph_author_name")
+		}
+
+		if viper.IsSet("telegraph_author_url") {
+			TelegraphAuthorURL = viper.GetString("telegraph_author_url")
+		}
 	}
 
 	if viper.IsSet("preview_text") {
 		PreviewText = viper.GetInt("preview_text")
-	} else {
-		PreviewText = 0
 	}
 
-	DisableWebPagePreview = viper.GetBool("disable_web_page_preview")
+	if viper.IsSet("allowed_users") {
+		intAllowUsers := viper.GetStringSlice("allowed_users")
+		for _, useIDStr := range intAllowUsers {
+			userID, err := strconv.ParseInt(useIDStr, 10, 64)
+			if err != nil {
+				panic(fmt.Errorf("Fatal error config file: %s", err))
+			}
+			AllowUsers = append(AllowUsers, userID)
+		}
+	}
+
+	if viper.IsSet("disable_web_page_preview") {
+		DisableWebPagePreview = viper.GetBool("disable_web_page_preview")
+	}
 
 	if viper.IsSet("telegram.endpoint") {
 		TelegramEndpoint = viper.GetString("telegram.endpoint")
-	} else {
-		TelegramEndpoint = tb.DefaultApiURL
 	}
 
 	if viper.IsSet("error_threshold") {
 		ErrorThreshold = uint(viper.GetInt("error_threshold"))
-	} else {
-		ErrorThreshold = 100
 	}
 
 	if viper.IsSet("update_interval") {
 		UpdateInterval = viper.GetInt("update_interval")
-	} else {
-		UpdateInterval = 10
 	}
 
 	if viper.IsSet("mysql.host") {
@@ -170,8 +122,6 @@ func init() {
 			Password: viper.GetString("mysql.password"),
 			DB:       viper.GetString("mysql.database"),
 		}
-	} else {
-		EnableMysql = false
 	}
 
 	if !EnableMysql {
@@ -192,18 +142,20 @@ func init() {
 		}
 	}
 
+	if viper.IsSet("log.db_log") {
+		DBLogMode = viper.GetBool("log.db_log")
+	}
 }
 
 func (t TplData) Render(mode tb.ParseMode) (string, error) {
-
 	var buf []byte
 	wb := bytes.NewBuffer(buf)
 
 	if mode == tb.ModeMarkdown {
-		mkd := regexp.MustCompile("[\\*\\[\\]`_]")
-		t.SourceTitle = mkd.ReplaceAllString(t.SourceTitle, " ")
-		t.ContentTitle = mkd.ReplaceAllString(t.ContentTitle, " ")
-		t.PreviewText = mkd.ReplaceAllString(t.PreviewText, " ")
+		mkd := regexp.MustCompile("(\\[|\\*|\\`|\\_)")
+		t.SourceTitle = mkd.ReplaceAllString(t.SourceTitle, "\\$1")
+		t.ContentTitle = mkd.ReplaceAllString(t.ContentTitle, "\\$1")
+		t.PreviewText = mkd.ReplaceAllString(t.PreviewText, "\\$1")
 	}
 
 	if err := MessageTpl.Execute(wb, t); err != nil {
@@ -252,7 +204,6 @@ func validateTPL() {
 }
 
 func initTPL() {
-
 	var tplMsg string
 	if viper.IsSet("message_tpl") {
 		tplMsg = viper.GetString("message_tpl")
@@ -273,7 +224,6 @@ func initTPL() {
 	} else {
 		MessageMode = tb.ModeMarkdown
 	}
-
 }
 
 func getInt(s string) int {
@@ -288,4 +238,16 @@ func (m *MysqlConfig) GetMysqlConnectingString() string {
 	port := m.Port
 	db := m.DB
 	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=true", usr, pwd, host, port, db)
+}
+
+func isInTests() bool {
+	for _, arg := range os.Args {
+		if strings.HasPrefix(arg, "-test") {
+			if arg == "-testtpl" {
+				continue
+			}
+			return true
+		}
+	}
+	return false
 }

@@ -1,10 +1,11 @@
 # flowerss bot
 
-[![Build Status](https://travis-ci.org/indes/flowerss-bot.svg?branch=master)](https://travis-ci.org/indes/flowerss-bot)
-[![Go Report Card](https://goreportcard.com/badge/github.com/indes/rssflow)](https://goreportcard.com/report/github.com/indes/flowerss-bot)
+[![Build Status](https://github.com/indes/flowerss-bot/workflows/Release/badge.svg)](https://github.com/indes/flowerss-bot/actions?query=workflow%3ARelease)
+[![Test Status](https://github.com/indes/flowerss-bot/workflows/Test/badge.svg)](https://github.com/indes/flowerss-bot/actions?query=workflow%3ATest)
+![Build Docker Image](https://github.com/indes/flowerss-bot/workflows/Build%20Docker%20Image/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/indes/flowerss-bot)](https://goreportcard.com/report/github.com/indes/flowerss-bot)
 ![GitHub](https://img.shields.io/github/license/indes/flowerss-bot.svg)
 
-DEMO: [https://t.me/rssflowbot](https://t.me/rssflowbot)  
 [安装与使用文档](https://flowerss-bot.now.sh/)  
 
 <img src="https://github.com/rssflow/img/raw/master/images/rssflow_demo.gif" width = "300"/>
@@ -27,13 +28,14 @@ DEMO: [https://t.me/rssflowbot](https://t.me/rssflowbot)
 /unsub [url] 取消订阅（url 为可选）
 /list 查看当前订阅
 /set 设置订阅
+/check 检查当前订阅
 /setfeedtag [sub id] [tag1] [tag2] 设置订阅标签（最多设置三个Tag，以空格分割）
+/setinterval [interval] [sub id] 设置订阅刷新频率（可设置多个sub id，以空格分割）
+/activeall 开启所有订阅
+/pauseall 暂停所有订阅
 /import 导入 OPML 文件
 /export 导出 OPML 文件
 /unsuball 取消所有订阅
 /help 帮助
 ```
-
-## License
-
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Findes%2Fflowerss-bot.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Findes%2Fflowerss-bot?ref=badge_large)
+详细使用方法请查阅项目[使用文档](https://flowerss-bot.now.sh/#/usage)。 

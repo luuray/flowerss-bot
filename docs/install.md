@@ -6,24 +6,30 @@
 
 ## Docker 部署
 
-### 1. 下载配置文件
+1.下载配置文件
 在项目目录下新建 `config.yml` 文件
 
 
 ```bash
-mkdir ~/flowerss123 &&\
-wget -O ~/flowerss123/config.yml \
+mkdir ~/flowerss &&\
+wget -O ~/flowerss/config.yml \
     https://raw.githubusercontent.com/indes/flowerss-bot/master/config.yml.sample
 ```
 
 
-### 2. 修改配置文件
+2.修改配置文件
 
 ```bash
 vim ~/flowerss/config.yml
 ```
 
-### 3. 运行
+修改配置文件中sqlite路径（如果使用sqlite作为数据库）：
+```yaml
+sqlite:
+  path: /root/.flowerss/data.db
+```
+
+3.运行
 
 ```shell script
 docker run -d -v ~/flowerss:/root/.flowerss indes/flowerss-bot
@@ -66,6 +72,9 @@ mysql:
   database: flowerss
 sqlite:
   path: ./data.db
+allowed_users:
+  - 123
+  - 234
 ```
 
 配置说明：
@@ -83,3 +92,4 @@ sqlite:
 | mysql                     | MySQL 数据库配置                           | 可忽略（使用 SQLite ）                     |
 | sqlite                    | SQLite 配置                               | 可忽略（已配置mysql时，该项失效）          |
 | telegram.endpoint         | 自定义telegram bot api url                | 可忽略（使用默认api url）          |
+| allowed_users             | 允许使用bot的用户telegram id，                        | 可忽略，为空时所有用户都能使用bot          |

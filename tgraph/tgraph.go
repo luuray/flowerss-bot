@@ -1,15 +1,15 @@
 package tgraph
 
 import (
-	"fmt"
+	"github.com/indes/flowerss-bot/log"
+
 	"github.com/indes/flowerss-bot/config"
 	"github.com/indes/telegraph-go"
-	"log"
 )
 
 const (
 	//verbose = false
-	html = `<h1>hello</h1>`
+	htmlContent = `<h1>hello</h1>`
 )
 
 var (
@@ -24,23 +24,48 @@ var (
 
 func init() {
 	if config.EnableTelegraph {
-		log.Println("Telegraph Enabled, Token len: ", len(authToken), "Token: ", authToken)
+		log.Infow("telegraph enabled",
+			"token count", len(authToken),
+			"token list", authToken,
+		)
 
 		telegraph.Verbose = verbose
 
 		for _, t := range authToken {
 			client, err := telegraph.Load(t, socks5Proxy)
 			if err != nil {
-				log.Println(fmt.Sprintf("Telegraph load error: %s token: %s", err, t))
+				log.Errorw("telegraph load error",
+					"error", err,
+					"token", t,
+				)
 			} else {
 				clientPool = append(clientPool, client)
 			}
 		}
 
 		if len(clientPool) == 0 {
-			config.EnableTelegraph = false
-			log.Println("Telegraph token error, telegraph disabled")
+			if config.TelegraphAccountName == "" {
+				config.EnableTelegraph = false
+				log.Error("telegraph token error, telegraph disabled")
+			} else if len(authToken) == 0 {
+				// create account
+				client, err := telegraph.Create(
+					config.TelegraphAccountName,
+					config.TelegraphAuthorName,
+					config.TelegraphAuthorURL,
+					config.Socks5,
+				)
+
+				if err != nil {
+					config.EnableTelegraph = false
+					log.Errorw("create telegraph account fail, telegraph disabled", "error", err)
+				}
+
+				clientPool = append(clientPool, client)
+				log.Infow("create telegraph account success",
+					"telegraph token", client.AccessToken)
+
+			}
 		}
 	}
-
 }
